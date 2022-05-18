@@ -1,0 +1,14 @@
+{
+  "name": "com.poly.arcecs.unity",
+  "displayName": "Poly ArcEcs Unity",
+  "version": "0.1.0-preview",
+  "unity": "2020.3",
+  "description": "Poly ArcEcs Unity",
+  "keywords": [
+    "unity",
+    "ecs",
+    "archetype"
+  ],
+  "dependencies": {
+  }
+}
