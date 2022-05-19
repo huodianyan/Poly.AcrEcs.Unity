@@ -1,16 +1,39 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Poly.ArcEcs
 {
+    public struct Parent
+    {
+        public EcsEntity Entity;
+    }
+    public struct Children
+    {
+        public List<EcsEntity> EntityList;
+
+        public void AddChild(EcsEntity entity)
+        {
+            EntityList ??= new List<EcsEntity>();
+            if (!EntityList.Contains(entity))
+                EntityList.Add(entity);
+        }
+        public void RemoveChild(EcsEntity entity)
+        {
+            EntityList.Remove(entity);
+        }
+    }
+
     #region Component
     public delegate IEcsComponentArray CreateComponentArrayDelegate(int capacity);
     internal delegate void CopyComponentDelegate(EcsArchetype src, int chunkId, EcsArchetype dest);
-    internal struct EcsComponentType
+    internal class EcsComponentType
     {
         //255: 0~254(0xFE)
         internal byte Id;
         internal Type Type;
+        //internal object Default;
+        internal IEcsComponentArray CompArray;
         internal CreateComponentArrayDelegate ComponentArrayCreator;
         internal CopyComponentDelegate CopyChunkComponent;
     }

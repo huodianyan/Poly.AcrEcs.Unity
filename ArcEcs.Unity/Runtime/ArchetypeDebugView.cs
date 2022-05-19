@@ -16,6 +16,7 @@ namespace Poly.ArcEcs.Unity
 
         public EcsWorld World => world;
         public EcsArchetype Archetype => archetype;
+        public WorldDebugSystem System => system;
 
         internal void Init(EcsWorld world, EcsArchetype archetype, WorldDebugSystem system)
         {

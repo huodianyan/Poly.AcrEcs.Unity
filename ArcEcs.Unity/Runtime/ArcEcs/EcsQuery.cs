@@ -6,11 +6,11 @@ namespace Poly.ArcEcs
 {
     #region Query
     internal delegate void ForEachArchetype(in EcsArchetype archetypeData);
-    public delegate void ForEachE(int e);
-    public delegate void ForEachEC<T0>(int e, ref T0 t0) where T0 : struct;
-    public delegate void ForEachECC<T0, T1>(int e, ref T0 t0, ref T1 t1) where T0 : struct where T1 : struct;
-    public delegate void ForEachECCC<T0, T1, T2>(int e, ref T0 t0, ref T1 t1, ref T2 t2) where T0 : struct where T1 : struct where T2 : struct;
-    public delegate void ForEachECCCC<T0, T1, T2, T3>(int e, ref T0 t0, ref T1 t1, ref T2 t2, ref T3 t3) where T0 : struct where T1 : struct where T2 : struct where T3 : struct;
+    public delegate void ForEachE(EcsEntity e);
+    public delegate void ForEachEC<T0>(EcsEntity e, ref T0 t0) where T0 : struct;
+    public delegate void ForEachECC<T0, T1>(EcsEntity e, ref T0 t0, ref T1 t1) where T0 : struct where T1 : struct;
+    public delegate void ForEachECCC<T0, T1, T2>(EcsEntity e, ref T0 t0, ref T1 t1, ref T2 t2) where T0 : struct where T1 : struct where T2 : struct;
+    public delegate void ForEachECCCC<T0, T1, T2, T3>(EcsEntity e, ref T0 t0, ref T1 t1, ref T2 t2, ref T3 t3) where T0 : struct where T1 : struct where T2 : struct where T3 : struct;
 
     public class EcsQuery
     {
@@ -55,10 +55,10 @@ namespace Poly.ArcEcs
             return count;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Matchs(int entityId)
+        public bool Matchs(EcsEntity entity)
         {
             //ref readonly var archetype = ref world.GetEntityArchetype(entityId);
-            var archetype = world.GetEntityArchetype(entityId);
+            var archetype = world.GetEntityArchetype(entity);
             return Marches(archetype);
         }
         internal bool Marches(in EcsArchetype archetype)
@@ -151,6 +151,7 @@ namespace Poly.ArcEcs
         }
         public void ForEach(ForEachE handler)
         {
+            var entities = world.entityInternals;
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -158,11 +159,12 @@ namespace Poly.ArcEcs
                 var entityIds = archetype.entityIds;
                 //for (int i = 0; i < entityCount; i++)
                 for (int i = entityCount - 1; i >= 0; i--)
-                    handler(entityIds[i]);
+                    handler(entities[entityIds[i]]);
             });
         }
         public void ForEach<T0>(ForEachEC<T0> handler) where T0 : struct
         {
+            var entities = world.entityInternals;
             var compId0 = world.GetComponentId(typeof(T0));
             ForEach((in EcsArchetype archetype) =>
             {
@@ -172,11 +174,12 @@ namespace Poly.ArcEcs
                 var comps = archetype.GetComps<T0>(compId0);
                 //for (int i = 0; i < entityCount; i++)
                 for (int i = entityCount - 1; i >= 0; i--)
-                    handler(entityIds[i], ref comps[i]);
+                    handler(entities[entityIds[i]], ref comps[i]);
             });
         }
         public void ForEach<T0, T1>(ForEachECC<T0, T1> handler) where T0 : struct where T1 : struct
         {
+            var entities = world.entityInternals;
             var compId0 = world.GetComponentId(typeof(T0));
             var compId1 = world.GetComponentId(typeof(T1));
             ForEach((in EcsArchetype archetype) =>
@@ -188,11 +191,12 @@ namespace Poly.ArcEcs
                 var comp1s = archetype.GetComps<T1>(compId1);
                 //for (int i = 0; i < entityCount; i++)
                 for (int i = entityCount - 1; i >= 0; i--)
-                    handler(entityIds[i], ref comp0s[i], ref comp1s[i]);
+                    handler(entities[entityIds[i]], ref comp0s[i], ref comp1s[i]);
             });
         }
         public void ForEach<T0, T1, T2>(ForEachECCC<T0, T1, T2> handler) where T0 : struct where T1 : struct where T2 : struct
         {
+            var entities = world.entityInternals;
             var compId0 = world.GetComponentId(typeof(T0));
             var compId1 = world.GetComponentId(typeof(T1));
             var compId2 = world.GetComponentId(typeof(T2));
@@ -206,11 +210,12 @@ namespace Poly.ArcEcs
                 var comp2s = archetype.GetComps<T2>(compId2);
                 //for (int i = 0; i < entityCount; i++)
                 for (int i = entityCount - 1; i >= 0; i--)
-                    handler(entityIds[i], ref comp0s[i], ref comp1s[i], ref comp2s[i]);
+                    handler(entities[entityIds[i]], ref comp0s[i], ref comp1s[i], ref comp2s[i]);
             });
         }
         public void ForEach<T0, T1, T2, T3>(ForEachECCCC<T0, T1, T2, T3> handler) where T0 : struct where T1 : struct where T2 : struct where T3 : struct
         {
+            var entities = world.entityInternals;
             var compId0 = world.GetComponentId(typeof(T0));
             var compId1 = world.GetComponentId(typeof(T1));
             var compId2 = world.GetComponentId(typeof(T2));
@@ -226,7 +231,7 @@ namespace Poly.ArcEcs
                 var comp3s = archetype.GetComps<T3>(compId3);
                 //for (int i = 0; i < entityCount; i++)
                 for (int i = entityCount - 1; i >= 0; i--)
-                    handler(entityIds[i], ref comp0s[i], ref comp1s[i], ref comp2s[i], ref comp3s[i]);
+                    handler(entities[entityIds[i]], ref comp0s[i], ref comp1s[i], ref comp2s[i], ref comp3s[i]);
             });
         }
         #endregion
@@ -243,6 +248,9 @@ namespace Poly.ArcEcs
         internal byte anyCount;
         internal byte noneCount;
         internal int hash;
+        public ArraySegment<byte> All => new ArraySegment<byte>(all, 0, allCount);
+        public ArraySegment<byte> Any => new ArraySegment<byte>(any, 0, anyCount);
+        public ArraySegment<byte> None => new ArraySegment<byte>(none, 0, noneCount);
 
         internal EcsQueryDesc(EcsWorld world)
         {

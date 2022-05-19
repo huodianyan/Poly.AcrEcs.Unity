@@ -13,7 +13,7 @@ namespace Poly.ArcEcs
         private bool isInited;
         private bool isDestroyed;
         //Entity
-        internal EcsEntity[] entities;
+        internal EcsEntityInternal[] entityInternals;
         internal int entityCount;
         private int[] recycledEntities;
         private int recycledEntityCount;
@@ -41,7 +41,7 @@ namespace Poly.ArcEcs
         //private int runSystemCount;
 
         public string Id => id;
-        public int WorldSize => entities.Length;
+        public int WorldSize => entityInternals.Length;
         public int EntityCount => entityCount - recycledEntityCount;
         public int ArchetypeCount => archetypeList.Count;
         public IList<EcsArchetype> ArchetypeList => archetypeList;
@@ -50,10 +50,10 @@ namespace Poly.ArcEcs
         public IList<IEcsSystem> SystemList => systemList;
 
         public event Action<int> WorldResizedEvent;
-        public event Action<int> EntityCreatedEvent;
-        public event Action<int> EntityDestroyedEvent;
-        public event Action<int, int> EntityComponentAddedEvent;
-        public event Action<int, int> EntityComponentRemovedEvent;
+        public event Action<EcsEntity> EntityCreatedEvent;
+        public event Action<EcsEntity> EntityDestroyedEvent;
+        public event Action<EcsEntity, int> ComponentAddedEvent;
+        public event Action<EcsEntity, int> ComponentRemovedEvent;
         public event Action<EcsQuery> QueryCreatedEvent;
         public event Action<EcsArchetype> ArchetypeCreatedEvent;
 
@@ -64,13 +64,13 @@ namespace Poly.ArcEcs
             this.shared = shared;
             //Entity
             var capacity = cfg.EntityCapacity > 0 ? cfg.EntityCapacity : Config.EntityCapacityDefault;
-            entities = new EcsEntity[capacity];
+            entityInternals = new EcsEntityInternal[capacity];
             entityCount = 0;
             capacity = cfg.RecycledEntityCapacity > 0 ? cfg.RecycledEntityCapacity : Config.RecycledEntityCapacityDefault;
             recycledEntities = new int[capacity];
             recycledEntityCount = 0;
             //ArcheType
-            capacity = cfg.ArchetypeCapacity > 0 ? cfg.ArchetypeCapacity : Config.ArchetypeCapacityDefault;
+            //capacity = cfg.ArchetypeCapacity > 0 ? cfg.ArchetypeCapacity : Config.ArchetypeCapacityDefault;
             var emptyArchetype = new EcsArchetype(this, 0, null, 0);
             //archetypes = new EcsArchetype[capacity];
             //archetypeCount = 0;
@@ -117,7 +117,7 @@ namespace Poly.ArcEcs
             }
             archetypeList.Clear();
             //Entity
-            entities = null;
+            entityInternals = null;
             entityCount = 0;
             recycledEntities = null;
             recycledEntityCount = 0;
@@ -161,201 +161,233 @@ namespace Poly.ArcEcs
         }
 
         #region Entity
-        public int GetAllEntities(ref int[] entityIds)
+        public int GetAllEntities(ref EcsEntity[] entities)
         {
             var count = entityCount - recycledEntityCount;
-            if (entityIds == null || entityIds.Length < count)
-                entityIds = new int[count];
+            if (entities == null || entities.Length < count)
+                entities = new EcsEntity[count];
             var id = 0;
             for (int i = 0, iMax = entityCount; i < iMax; i++)
             {
-                ref var entity = ref entities[i];
+                ref var entityInternal = ref this.entityInternals[i];
                 // should we skip empty entities here?
-                if (entity.Version > 0 && entity.ComponentCount >= 0)
-                    entityIds[id++] = i;
+                if (entityInternal.Version > 0 && entityInternal.ComponentCount >= 0)
+                    entities[id++] = entityInternal;
             }
             return count;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref readonly EcsEntity GetEntity(int entityId) => ref entities[entityId];
-        public short GetEntityVersion(int entityId) => entities[entityId].Version;
-        private ref EcsEntity CreateEntityStruct()
+        public bool IsEntityValid(EcsEntity entity) => entityInternals[entity.Index].Version == entity.Version;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EcsEntity GetEntity(int entityId) => entityInternals[entityId];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool IsEntityValid(int entityId) => entityId >= 0 && entityId < entityCount && entityInternals[entityId].Version > 0;
+
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //internal ref readonly EcsEntityInternal GetEntityInternal(int entityId) => ref entities[entityId];
+        //public short GetEntityVersion(int entityId) => entities[entityId].Version;
+        private ref EcsEntityInternal CreateEntityInternal()
         {
             int entityId;
             if (recycledEntityCount > 0)
             {
                 entityId = recycledEntities[--recycledEntityCount];
-                ref var entity = ref entities[entityId];
+                ref var entity = ref entityInternals[entityId];
                 entity.Version = (short)-entity.Version;
             }
             else
             {
                 // new entity.
-                if (entityCount == entities.Length)
+                if (entityCount == entityInternals.Length)
                 {
                     var newSize = entityCount << 1;
-                    Array.Resize(ref entities, newSize);
+                    Array.Resize(ref entityInternals, newSize);
                     WorldResizedEvent?.Invoke(newSize);
                 }
                 entityId = entityCount++;
-                ref var entity = ref entities[entityId];
+                ref var entity = ref entityInternals[entityId];
                 entity.Index = entityId;
                 entity.Version = 1;
             }
             //EntityCreatedEvent?.Invoke(entity);
-            return ref entities[entityId];
+            return ref entityInternals[entityId];
         }
-        private void DestroyEntityStruct(ref EcsEntity entity)
+        private void DestroyEntityInternal(ref EcsEntityInternal entityInternal)
         {
-            var entityId = entity.Index;
-            entity.Version = (short)(entity.Version == short.MaxValue ? -1 : -(entity.Version + 1));
+            var entityId = entityInternal.Index;
+            entityInternal.Version = (short)(entityInternal.Version == short.MaxValue ? -1 : -(entityInternal.Version + 1));
             if (recycledEntityCount == recycledEntities.Length) Array.Resize(ref recycledEntities, recycledEntityCount << 1);
+            entityInternal.ComponentCount = 0;
+            entityInternal.ArchetypeId = 0;
+            entityInternal.ArchetypeChunkId = 0;
             recycledEntities[recycledEntityCount++] = entityId;
         }
-        //public int CreateEntity(params Type[] types)
-        //{
-        //    ref var entity = ref CreateEntity();
-        //    ref var archetype = ref GetArchetype(types);
-        //    entity.ArchetypeId = archetype.id;
-        //    var entityId = entity.Index;
-        //    archetype.AddEntity(ref entity);
-        //    //Console.WriteLine($"EcsWorld.CreateEntity: {entityId},{archetypeData.entityList.Count}");
-        //    return entityId;
-        //}
-        public int CreateEntity() => CreateEntity(null, 0);
-        public int CreateEntity(params Type[] types) => CreateEntity(GetCompnentIds(types), types.Length);
-        public int CreateEntity(params byte[] compIds) => CreateEntity(compIds, compIds.Length);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int CreateEntity(byte[] compIds, int count)
+        public EcsEntity CreateEntity() => CreateEntityInternal(null, 0);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EcsEntity CreateEntity(params Type[] types) => CreateEntityInternal(GetCompnentIds(types), types.Length);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EcsEntity CreateEntity(params byte[] compIds) => CreateEntityInternal(compIds, compIds.Length);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref EcsEntityInternal CreateEntityInternal(params byte[] compIds) => ref CreateEntityInternal(compIds, compIds.Length);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref EcsEntityInternal CreateEntityInternal(byte[] compIds, int count)
         {
-            ref var entity = ref CreateEntityStruct();
+            ref var entity = ref CreateEntityInternal();
             //ref var archetype = ref GetArchetype(compIds, count);
             var archetype = GetArchetype(compIds, count);
             entity.ArchetypeId = archetype.id;
             var entityId = entity.Index;
             archetype.AddEntity(ref entity);
             //Console.WriteLine($"EcsWorld.CreateEntity: {entityId},{archetypeData.entityList.Count}");
-            EntityCreatedEvent?.Invoke(entityId);
-            return entityId;
+            EntityCreatedEvent?.Invoke(entity);
+            return ref entity;
         }
-        public void DestroyEntity(int entityId)
+        public void DestroyEntity(EcsEntity entity)
         {
-            ref var entity = ref entities[entityId];
-            if (entity.Version < 0) return;
-            var archetypeId = entity.ArchetypeId;
+            if (!IsEntityValid(entity)) return;
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entityInternal.Version < 0) return;
+            var archetypeId = entityInternal.ArchetypeId;
             //ref var archetype = ref archetypes[archetypeId];
             var archetype = archetypeList[archetypeId];
-            archetype.RemoveEntity(ref entity);
+            archetype.RemoveEntity(ref entityInternal);
 
-            DestroyEntityStruct(ref entity);
+            DestroyEntityInternal(ref entityInternal);
             //entity.Version = (short)(entity.Version == short.MaxValue ? -1 : -(entity.Version + 1));
             //if (recycledEntityCount == recycledEntities.Length) Array.Resize(ref recycledEntities, recycledEntityCount << 1);
             //recycledEntities[recycledEntityCount++] = entityId;
-            EntityDestroyedEvent?.Invoke(entityId);
+            EntityDestroyedEvent?.Invoke(entityInternal);
         }
-        public int CreateEntity<T0>(T0 comp0) where T0 : struct
+        public EcsEntity CreateEntity<T0>(T0 comp0) where T0 : struct
         {
-            var entityId = CreateEntity(typeof(T0));
-            SetComponent(entityId, comp0);
-            return entityId;
+            var id0 = GetComponentId(typeof(T0));
+            ref var entity = ref CreateEntityInternal(id0);
+            SetComponentInternal(ref entity, comp0, id0);
+            return entity;
         }
-        public int CreateEntity<T0, T1>(T0 comp0, T1 comp1) where T0 : struct where T1 : struct
+        public EcsEntity CreateEntity<T0, T1>(T0 comp0, T1 comp1) where T0 : struct where T1 : struct
         {
-            var entityId = CreateEntity(typeof(T0), typeof(T1));
-            SetComponent(entityId, comp0);
-            SetComponent(entityId, comp1);
-            return entityId;
+            var id0 = GetComponentId(typeof(T0));
+            var id1 = GetComponentId(typeof(T1));
+            ref var entity = ref CreateEntityInternal(id0, id1);
+            SetComponentInternal(ref entity, comp0, id0);
+            SetComponentInternal(ref entity, comp1, id1);
+            return entity;
         }
-        public int CreateEntity<T0, T1, T2>(T0 comp0, T1 comp1, T2 comp2) where T0 : struct where T1 : struct where T2 : struct
+        public EcsEntity CreateEntity<T0, T1, T2>(T0 comp0, T1 comp1, T2 comp2) where T0 : struct where T1 : struct where T2 : struct
         {
-            var entityId = CreateEntity(typeof(T0), typeof(T1), typeof(T2));
-            SetComponent(entityId, comp0);
-            SetComponent(entityId, comp1);
-            SetComponent(entityId, comp2);
-            return entityId;
+            var id0 = GetComponentId(typeof(T0));
+            var id1 = GetComponentId(typeof(T1));
+            var id2 = GetComponentId(typeof(T2));
+            ref var entity = ref CreateEntityInternal(id0, id1, id2);
+            SetComponentInternal(ref entity, comp0, id0);
+            SetComponentInternal(ref entity, comp1, id1);
+            SetComponentInternal(ref entity, comp2, id2);
+            return entity;
         }
-        public int CreateEntity<T0, T1, T2, T3>(T0 comp0, T1 comp1, T2 comp2, T3 comp3) where T0 : struct where T1 : struct where T2 : struct where T3 : struct
+        public EcsEntity CreateEntity<T0, T1, T2, T3>(T0 comp0, T1 comp1, T2 comp2, T3 comp3) where T0 : struct where T1 : struct where T2 : struct where T3 : struct
         {
-            var entityId = CreateEntity(typeof(T0), typeof(T1), typeof(T2));
-            SetComponent(entityId, comp0);
-            SetComponent(entityId, comp1);
-            SetComponent(entityId, comp2);
-            SetComponent(entityId, comp3);
-            return entityId;
+            var id0 = GetComponentId(typeof(T0));
+            var id1 = GetComponentId(typeof(T1));
+            var id2 = GetComponentId(typeof(T2));
+            var id3 = GetComponentId(typeof(T3));
+            ref var entity = ref CreateEntityInternal(id0, id1, id2, id3);
+            SetComponentInternal(ref entity, comp0, id0);
+            SetComponentInternal(ref entity, comp1, id1);
+            SetComponentInternal(ref entity, comp2, id2);
+            SetComponentInternal(ref entity, comp3, id3);
+            return entity;
+        }
+        public bool HasComponent<T>(EcsEntity entity) where T : struct
+        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return false;
+            var compId = GetComponentId(typeof(T));
+            return HasComponentInternal(ref entityInternal, compId);
+        }
+        public bool HasComponent(EcsEntity entity, byte compId)
+        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return false;
+            return HasComponentInternal(ref entityInternal, compId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsEntityValid(int entityId) => entityId >= 0 && entityId < entityCount && entities[entityId].Version > 0;
-        public bool HasComponent<T>(int entityId) where T : struct
+        internal bool HasComponentInternal(ref EcsEntityInternal entityInternal, byte compId) => archetypeList[entityInternal.ArchetypeId].HasComponent(compId);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T GetComponent<T>(EcsEntity entity) where T : struct
         {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return ref GetDefaultComp<T>();
             var compId = GetComponentId(typeof(T));
-            ref var entity = ref entities[entityId];
-            var archetypeId = entity.ArchetypeId;
-            //ref var archetype = ref archetypes[archetypeId];
-            var archetype = archetypeList[archetypeId];
-            return archetype.HasComponent(compId);
+            return ref GetComponentInternal<T>(ref entityInternal, compId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(int entityId) where T : struct
+        public ref T GetComponent<T>(EcsEntity entity, byte compId) where T : struct
         {
-            var compId = GetComponentId(typeof(T));
-            return ref GetComponent<T>(entityId, compId);
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return ref GetDefaultComp<T>();
+            return ref GetComponentInternal<T>(ref entityInternal, compId);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref T GetComponentInternal<T>(ref EcsEntityInternal entityInternal, byte compId) where T : struct
+        {
+            var archetype = archetypeList[entityInternal.ArchetypeId];
+            return ref archetype.GetComponent<T>(compId, entityInternal.ArchetypeChunkId);
+        }
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public ref T AddComponent<T>(int entityId) where T : struct
+        //{
+        //    var addCompId = GetComponentId(typeof(T));
+        //    return ref AddComponent<T>(entityId, addCompId);
+        //}
+        //public ref T AddComponent<T>(int entityId, byte addCompId) where T : struct
+        //{
+        //    ref var entity = ref entities[entityId];
+        //    //ref var archetype = ref archetypes[entity.ArchetypeId];
+        //    var archetype = archetypeList[entity.ArchetypeId];
+        //    //ref var nextArchetype = ref GetNextArchetype(ref archetype, addCompId);
+        //    var nextArchetype = GetNextArchetype(archetype, addCompId);
+        //    //move comp data
+        //    var chunkId = entity.ArchetypeChunkId;
+        //    foreach (var compId in archetype.compIds)
+        //    {
+        //        ref var compType = ref GetComponentTypeData(compId);
+        //        compType.CopyChunkComponent(archetype, chunkId, nextArchetype);
+        //        //var comp = archetypeData.GetComponent<T>(compId, chunkId);
+        //        //nextArchetypeData.AddComponent(compId, comp);
+        //    }
+        //    ref var comp = ref nextArchetype.AddComponent<T>(addCompId);
+        //    archetype.RemoveEntity(ref entity);
+        //    nextArchetype.AddEntity(ref entity);
+        //    ComponentAddedEvent?.Invoke(entityId, addCompId);
+        //    return ref comp;
+        //}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddComponent<T>(EcsEntity entity, T addComp = default) where T : struct
+        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
+            var addCompId = GetComponentId(typeof(T));
+            AddComponentInternal<T>(ref entityInternal, addComp, addCompId);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddComponent<T>(EcsEntity entity, T addComp, byte addCompId) where T : struct
+        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
+            AddComponentInternal<T>(ref entityInternal, addComp, addCompId);
+        }
+        internal void AddComponentInternal<T>(ref EcsEntityInternal entityInternal, T addComp, byte addCompId) where T : struct
+        {
             //ref var entity = ref entities[entityId];
-            //var archetypeId = entity.ArchetypeId;
-            //var chunkId = entity.ArchetypeChunkId;
-            //ref var archetype = ref archetypes[archetypeId];
-            //return ref archetype.GetComponent<T>(compId, chunkId);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetComponent<T>(int entityId, byte compId) where T : struct
-        {
-            ref var entity = ref entities[entityId];
             //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
-            return ref archetype.GetComponent<T>(compId, entity.ArchetypeChunkId);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T AddComponent<T>(int entityId) where T : struct
-        {
-            var addCompId = GetComponentId(typeof(T));
-            return ref AddComponent<T>(entityId, addCompId);
-        }
-        public ref T AddComponent<T>(int entityId, byte addCompId) where T : struct
-        {
-            ref var entity = ref entities[entityId];
-            //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
+            var archetype = archetypeList[entityInternal.ArchetypeId];
             //ref var nextArchetype = ref GetNextArchetype(ref archetype, addCompId);
             var nextArchetype = GetNextArchetype(archetype, addCompId);
             //move comp data
-            var chunkId = entity.ArchetypeChunkId;
-            foreach (var compId in archetype.compIds)
-            {
-                ref var compType = ref GetComponentTypeData(compId);
-                compType.CopyChunkComponent(archetype, chunkId, nextArchetype);
-                //var comp = archetypeData.GetComponent<T>(compId, chunkId);
-                //nextArchetypeData.AddComponent(compId, comp);
-            }
-            ref var comp = ref nextArchetype.AddComponent<T>(addCompId);
-            archetype.RemoveEntity(ref entity);
-            nextArchetype.AddEntity(ref entity);
-            EntityComponentAddedEvent?.Invoke(entityId, addCompId);
-            return ref comp;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddComponent<T>(int entityId, T addComp) where T : struct
-        {
-            var addCompId = GetComponentId(typeof(T));
-            AddComponent<T>(entityId, addComp, addCompId);
-        }
-        public void AddComponent<T>(int entityId, T addComp, byte addCompId) where T : struct
-        {
-            ref var entity = ref entities[entityId];
-            //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
-            //ref var nextArchetype = ref GetNextArchetype(ref archetype, addCompId);
-            var nextArchetype = GetNextArchetype(archetype, addCompId);
-            //move comp data
-            var chunkId = entity.ArchetypeChunkId;
+            var chunkId = entityInternal.ArchetypeChunkId;
             foreach (var compId in archetype.compIds)
             {
                 ref var compType = ref GetComponentTypeData(compId);
@@ -364,19 +396,36 @@ namespace Poly.ArcEcs
                 //nextArchetypeData.AddComponent(compId, comp);
             }
             nextArchetype.AddComponent(addCompId, addComp);
-            archetype.RemoveEntity(ref entity);
-            nextArchetype.AddEntity(ref entity);
-            EntityComponentAddedEvent?.Invoke(entityId, addCompId);
+            archetype.RemoveEntity(ref entityInternal);
+            nextArchetype.AddEntity(ref entityInternal);
+            entityInternal.ComponentCount++;
+            ComponentAddedEvent?.Invoke(entityInternal, addCompId);
         }
-        public void RemoveComponent(int entityId, byte removeCompId)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveComponent(EcsEntity entity, byte removeCompId)
         {
-            ref var entity = ref entities[entityId];
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
+            RemoveComponentInternal(ref entityInternal, removeCompId);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveComponent<T>(EcsEntity entity) where T : struct
+        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
+            var removeCompId = GetComponentId(typeof(T));
+            //RemoveComponent(entityId, removeCompId);
+            RemoveComponentInternal(ref entityInternal, removeCompId);
+        }
+        private void RemoveComponentInternal(ref EcsEntityInternal entityInternal, byte removeCompId)
+        {
+            //ref var entity = ref entities[entityId];
             //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
+            var archetype = archetypeList[entityInternal.ArchetypeId];
             //ref var preArchetype = ref GetPreArchetype(ref archetype, removeCompId);
             var preArchetype = GetPreArchetype(archetype, removeCompId);
             //move comp data
-            var chunkId = entity.ArchetypeChunkId;
+            var chunkId = entityInternal.ArchetypeChunkId;
             foreach (var compId in archetype.compIds)
             {
                 if (compId == removeCompId) continue;
@@ -385,60 +434,73 @@ namespace Poly.ArcEcs
                 //var comp = archetypeData.GetComponent<T>(compId, chunkId);
                 //preArchetypeData.AddComponent<T>(compId, comp);
             }
-            archetype.RemoveEntity(ref entity);
-            preArchetype.AddEntity(ref entity);
-            EntityComponentRemovedEvent?.Invoke(entityId, removeCompId);
+            archetype.RemoveEntity(ref entityInternal);
+            preArchetype.AddEntity(ref entityInternal);
+            entityInternal.ComponentCount--;
+            ComponentRemovedEvent?.Invoke(entityInternal, removeCompId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveComponent<T>(int entityId) where T : struct
+        public void SetComponent<T>(EcsEntity entity, T comp) where T : struct
         {
-            var removeCompId = GetComponentId(typeof(T));
-            RemoveComponent(entityId, removeCompId);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetComponent<T>(int entityId, T comp) where T : struct
-        {
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
             var compId = GetComponentId(typeof(T));
-            SetComponent<T>(entityId, comp, compId);
+            //SetComponent<T>(entityId, comp, compId);
+            SetComponentInternal(ref entityInternal, comp, compId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetComponent<T>(int entityId, T comp, byte compId) where T : struct
+        public void SetComponent<T>(EcsEntity entity, T comp, byte compId) where T : struct
         {
-            ref var entity = ref entities[entityId];
-            //ref var archetype = ref archetypes[entity.ArchetypeId];
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
+            //var archetype = archetypeList[entityInternal.ArchetypeId];
+            //archetype.SetComponent(compId, entityInternal.ArchetypeChunkId, comp);
+
+            SetComponentInternal(ref entityInternal, comp, compId);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetComponentInternal<T>(ref EcsEntityInternal entity, T comp, byte compId) where T : struct
+        {
             var archetype = archetypeList[entity.ArchetypeId];
             archetype.SetComponent(compId, entity.ArchetypeChunkId, comp);
         }
-        public void SetComponent(int entityId, object comp)
+        public void SetComponent(EcsEntity entity, object comp)
         {
             if (comp == null) return;
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return;
             var compId = GetComponentId(comp.GetType());
-            ref var entity = ref entities[entityId];
-            var archetype = archetypeList[entity.ArchetypeId];
-            archetype.SetComponent(compId, entity.ArchetypeChunkId, comp);
+            var archetype = archetypeList[entityInternal.ArchetypeId];
+            archetype.SetComponent(compId, entityInternal.ArchetypeChunkId, comp);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         //public ref readonly EcsArchetype GetEntityArchetype(int entityId)
-        public EcsArchetype GetEntityArchetype(int entityId)
+        public EcsArchetype GetEntityArchetype(EcsEntity entity)
         {
-            ref var entity = ref entities[entityId];
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return null;
+            //ref var entity = ref entities[entityId];
             //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
+            var archetype = archetypeList[entityInternal.ArchetypeId];
             return archetype;
         }
-        public int GetComponents(int entityId, ref object[] comps)
+        public int GetComponents(EcsEntity entity, ref object[] comps)
         {
-            ref var entity = ref entities[entityId];
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return 0;
+            //ref var entity = ref entities[entityId];
             //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
-            return archetype.GetComps(entity.ArchetypeChunkId, ref comps);
+            var archetype = archetypeList[entityInternal.ArchetypeId];
+            return archetype.GetComps(entityInternal.ArchetypeChunkId, ref comps);
         }
-        public int GetComponentTypes(int entityId, ref Type[] types)
+        public int GetComponentTypes(EcsEntity entity, ref Type[] types)
         {
-            ref var entity = ref entities[entityId];
+            ref var entityInternal = ref entityInternals[entity.Index];
+            if (entity.Version != entityInternal.Version) return 0;
+            //ref var entity = ref entities[entityId];
             //ref var archetype = ref archetypes[entity.ArchetypeId];
-            var archetype = archetypeList[entity.ArchetypeId];
-            var compCount = entity.ComponentCount;
+            var archetype = archetypeList[entityInternal.ArchetypeId];
+            var compCount = entityInternal.ComponentCount;
             if (compCount == 0) { return 0; }
             if (types == null || types.Length < compCount)
                 types = new Type[compCount];
@@ -453,13 +515,16 @@ namespace Poly.ArcEcs
         #region Archetype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         //public ref readonly EcsArchetype GetArchetype(int archetypeId) => ref archetypes[archetypeId];
-        public EcsArchetype GetArchetype(int archetypeId) => archetypeList[archetypeId];
+        internal EcsArchetype GetArchetype(int archetypeId) => archetypeList[archetypeId];
         //internal ref EcsArchetype GetNextArchetype(ref EcsArchetype archetype, byte addCompId)
         internal EcsArchetype GetNextArchetype(EcsArchetype archetype, byte addCompId)
         {
-            var archetypeId = archetype.NextIds[addCompId];
-            if (archetypeId > 0)
-                return archetypeList[archetypeId];
+            //var archetypeId = archetype.nextIds[addCompId];
+            //if (archetypeId > 0)
+            //    return archetypeList[archetypeId];
+            var nextArchetype = archetype.nexts[addCompId];
+            if (nextArchetype != null)
+                return nextArchetype;
             //tempCompCount = archetypeData.compCount + 1;
             bool added = false;
             int length = 0;
@@ -476,18 +541,23 @@ namespace Poly.ArcEcs
             }
             if (!added) tempCompIds[length++] = addCompId;
             //ref var nextArchetype = ref GetArchetype(tempCompIds, length);
-            var nextArchetype = GetArchetype(tempCompIds, length);
-            archetype.NextIds[addCompId] = nextArchetype.id;
-            nextArchetype.PreIds[addCompId] = archetype.id;
-            Console.WriteLine($"EcsWorld.GetNextArchetype: {archetype.id}->{nextArchetype.id}, {addCompId}");
+            nextArchetype = GetArchetype(tempCompIds, length);
+            //archetype.nextIds[addCompId] = nextArchetype.id;
+            //nextArchetype.preIds[addCompId] = archetype.id;
+            archetype.nexts[addCompId] = nextArchetype;
+            nextArchetype.pres[addCompId] = archetype;
+            //Console.WriteLine($"EcsWorld.GetNextArchetype: {archetype.id}->{nextArchetype.id}, {addCompId}");
             return nextArchetype;
         }
         //internal ref EcsArchetype GetPreArchetype(ref EcsArchetype archetype, byte removeCompId)
         internal EcsArchetype GetPreArchetype(EcsArchetype archetype, byte removeCompId)
         {
-            var archetypeId = archetype.PreIds[removeCompId];
-            if (archetypeId > 0)
-                return archetypeList[archetypeId];
+            //var archetypeId = archetype.preIds[removeCompId];
+            //if (archetypeId > 0)
+            //    return archetypeList[archetypeId];
+            var preArchetype = archetype.pres[removeCompId];
+            if (preArchetype != null)
+                return preArchetype;
             //tempCompIds.Length = archetypeData.compCount - 1;
             int length = 0;
             foreach (var compId in archetype.compIds)
@@ -495,10 +565,12 @@ namespace Poly.ArcEcs
                 if (removeCompId != compId)
                     tempCompIds[length++] = compId;
             }
-            var preArchetype = GetArchetype(tempCompIds, length);
-            preArchetype.NextIds[removeCompId] = archetype.id;
-            archetype.PreIds[removeCompId] = preArchetype.id;
-            Console.WriteLine($"EcsWorld.GetPreArchetype: {archetype.id}->{preArchetype.id}, {removeCompId}");
+            preArchetype = GetArchetype(tempCompIds, length);
+            //preArchetype.nextIds[removeCompId] = archetype.id;
+            //archetype.preIds[removeCompId] = preArchetype.id;
+            preArchetype.nexts[removeCompId] = archetype;
+            archetype.pres[removeCompId] = preArchetype;
+            //Console.WriteLine($"EcsWorld.GetPreArchetype: {archetype.id}->{preArchetype.id}, {removeCompId}");
             return preArchetype;
         }
         //public ref EcsArchetype GetArchetype(params Type[] types)
@@ -522,23 +594,29 @@ namespace Poly.ArcEcs
             for (int i = 0; i < count; i++)
             {
                 var compId = compIds[i];
-                var nextArchetypeId = curArchetype.NextIds[compId];
-                if (nextArchetypeId == 0)
+                //var nextArchetypeId = curArchetype.nextIds[compId];
+                //if (nextArchetypeId == 0)
+                var nextArchetype = curArchetype.nexts[compId];
+                if (nextArchetype == null)
                 {
                     //create new
                     //if (archetypeCount == archetypes.Length) Array.Resize(ref archetypes, archetypeCount << 1);
                     //nextArchetypeId = archetypeCount++;
-                    nextArchetypeId = archetypeList.Count;
+                    var nextArchetypeId = archetypeList.Count;
                     var archetype = new EcsArchetype(this, nextArchetypeId, compIds, i + 1);
-                    archetype.PreIds[compId] = curArchetype.id;
-                    curArchetype.NextIds[compId] = nextArchetypeId;
+                    //archetype.preIds[compId] = curArchetype.id;
+                    //curArchetype.nextIds[compId] = nextArchetypeId;
+                    archetype.pres[compId] = curArchetype;
+                    curArchetype.nexts[compId] = archetype;
                     //archetypes[nextArchetypeId] = archetype;
                     archetypeList.Add(archetype);
                     //archetypeCount++;
                     //Console.WriteLine($"EcsArchetypeData.GetArchetypeData: {nextArchetypeId},[{string.Join(",", archetypeData.compIds)}]");
                     ArchetypeCreatedEvent?.Invoke(archetype);
+                    nextArchetype = archetype;
                 }
-                curArchetype = archetypeList[nextArchetypeId];
+                //curArchetype = archetypeList[nextArchetypeId];
+                curArchetype = nextArchetype;
             }
             return curArchetype;
         }
@@ -555,6 +633,7 @@ namespace Poly.ArcEcs
             {
                 Id = compId,
                 Type = type,
+                CompArray = new EcsComponentArray<T>(1),
                 ComponentArrayCreator = (capacity) => new EcsComponentArray<T>(capacity),
                 CopyChunkComponent = (src, chunkId, dest) =>
                 {
@@ -566,6 +645,11 @@ namespace Poly.ArcEcs
             compTypes[compId] = compType;
             compTypeCount++;
             return compId;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref T GetDefaultComp<T>() where T : struct
+        {
+            return ref ((EcsComponentArray<T>)compTypeDict[typeof(T)].CompArray).Array[0];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal byte[] GetCompnentIds(params Type[] types)
@@ -705,13 +789,13 @@ namespace Poly.ArcEcs
         {
             public int EntityCapacity;
             public int RecycledEntityCapacity;
-            public int ArchetypeCapacity;
-            public int QueryCapacity;
+            //public int ArchetypeCapacity;
+            //public int QueryCapacity;
             //public int SystemCapacity;
             internal const int EntityCapacityDefault = 512;
             internal const int RecycledEntityCapacityDefault = 512;
-            internal const int ArchetypeCapacityDefault = 512;
-            internal const int QueryCapacityDefault = 512;
+            //internal const int ArchetypeCapacityDefault = 512;
+            //internal const int QueryCapacityDefault = 512;
             //internal const int SystemCapacityDefault = 64;
         }
     }

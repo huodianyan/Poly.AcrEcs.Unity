@@ -10,7 +10,7 @@ namespace Poly.ArcEcs.Unity.Editor
     {
         static object[] compCache = new object[32];
         SerializedProperty compListProp;
-
+        // SerializedProperty entityProp;
 
         private void OnEnable()
         {
@@ -44,15 +44,19 @@ namespace Poly.ArcEcs.Unity.Editor
             var debugView = (EntityDebugView)target;
             if (debugView.World == null)
                 return;
-            if (!debugView.gameObject.activeSelf)
-                return;
 
             var world = debugView.World;
             var entity = debugView.Entity;
             var compList = debugView.ComponentList;
 
+            GUI.enabled = false;
+            EditorGUILayout.TextField("World", world.Id);
+            EditorGUILayout.IntField("EntityId", entity.Index);
+            EditorGUILayout.IntField("EntityVersion", entity.Version);
+            GUI.enabled = true;
             // compList.Clear();
-
+            if (!debugView.gameObject.activeSelf)
+                return;
             // var count = world.GetEntityComponents(debugView.Entity, ref compCache);
             // for (var i = 0; i < count; i++)
             // {
@@ -110,7 +114,11 @@ namespace Poly.ArcEcs.Unity.Editor
                 //     Debug.LogError($"{changeIndex}: {ex}");
                 // }
             }
-
+            // if(EditorGUILayout.Toggle("Destroy", false, "Button"))
+            if(GUILayout.Button("Destroy"))
+            {
+                world.DestroyEntity(entity);
+            }
             // EditorUtility.SetDirty(target);
 
             // base.OnInspectorGUI();

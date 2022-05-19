@@ -22,7 +22,9 @@ namespace Poly.ArcEcs.Unity.Example
             world.RegisterComponent<CComp>();
 
             world.AddSystem(new TestQueryEventSystem());
+#if UNITY_EDITOR
             world.AddSystem(new WorldDebugSystem());
+#endif
             world.Init();
 
         }
@@ -32,7 +34,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         private void Update()
         {
-            int entity = -1;
+            EcsEntity entity = default;
             if (Input.GetKeyDown(KeyCode.A))
             {
                 entity = world.CreateEntity();
@@ -50,7 +52,7 @@ namespace Poly.ArcEcs.Unity.Example
                 entity = world.CreateEntity();
                 world.AddComponent<CComp>(entity);
             }
-            if (entity >= 0)
+            if (entity.IsValid())
                 Debug.Log($"Create Entity: {entity}");
             world.Update();
         }
@@ -78,7 +80,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         public void Init(EcsWorld world)
         {
-            var desc = world.CreateQueryDesc().WithAll<AComp>().Build();
+            var desc = world.CreateQueryDesc().WithAll<AComp, BComp>().WithNone<CComp>().Build();
             query = world.GetQuery(desc);
             query.ArchetypeAddedEvent += OnArchetypeAddedEvent;
         }
@@ -89,7 +91,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         public void Update()
         {
-            query.ForEach((int entityId, ref AComp a) =>
+            query.ForEach((EcsEntity entity, ref AComp a) =>
             {
                 a.A++;
             });
