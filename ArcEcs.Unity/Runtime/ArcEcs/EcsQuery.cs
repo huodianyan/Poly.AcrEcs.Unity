@@ -126,7 +126,7 @@ namespace Poly.ArcEcs
                 var count2 = EcsUtil.NextPowerOf2(count);
                 comps = new T[count2];
             }
-            var compId0 = world.GetComponentId(typeof(T));
+            var compId0 = world.GetComponentId<T>();
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -165,7 +165,7 @@ namespace Poly.ArcEcs
         public void ForEach<T0>(ForEachEC<T0> handler) where T0 : struct
         {
             var entities = world.entityInternals;
-            var compId0 = world.GetComponentId(typeof(T0));
+            var compId0 = world.GetComponentId<T0>();
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -180,8 +180,8 @@ namespace Poly.ArcEcs
         public void ForEach<T0, T1>(ForEachECC<T0, T1> handler) where T0 : struct where T1 : struct
         {
             var entities = world.entityInternals;
-            var compId0 = world.GetComponentId(typeof(T0));
-            var compId1 = world.GetComponentId(typeof(T1));
+            var compId0 = world.GetComponentId<T0>();
+            var compId1 = world.GetComponentId<T1>();
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -197,9 +197,9 @@ namespace Poly.ArcEcs
         public void ForEach<T0, T1, T2>(ForEachECCC<T0, T1, T2> handler) where T0 : struct where T1 : struct where T2 : struct
         {
             var entities = world.entityInternals;
-            var compId0 = world.GetComponentId(typeof(T0));
-            var compId1 = world.GetComponentId(typeof(T1));
-            var compId2 = world.GetComponentId(typeof(T2));
+            var compId0 = world.GetComponentId<T0>();
+            var compId1 = world.GetComponentId<T1>();
+            var compId2 = world.GetComponentId<T2>();
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -216,10 +216,10 @@ namespace Poly.ArcEcs
         public void ForEach<T0, T1, T2, T3>(ForEachECCCC<T0, T1, T2, T3> handler) where T0 : struct where T1 : struct where T2 : struct where T3 : struct
         {
             var entities = world.entityInternals;
-            var compId0 = world.GetComponentId(typeof(T0));
-            var compId1 = world.GetComponentId(typeof(T1));
-            var compId2 = world.GetComponentId(typeof(T2));
-            var compId3 = world.GetComponentId(typeof(T3));
+            var compId0 = world.GetComponentId<T0>();
+            var compId1 = world.GetComponentId<T1>();
+            var compId2 = world.GetComponentId<T2>();
+            var compId3 = world.GetComponentId<T3>();
             ForEach((in EcsArchetype archetype) =>
             {
                 var entityCount = archetype.entityCount;
@@ -310,15 +310,15 @@ namespace Poly.ArcEcs
             foreach (var compId in compIds) WithAll(compId);
             return this;
         }
-        public EcsQueryDesc WithAll(params Type[] types)
-        {
-            foreach (var type in types) WithAll(world.GetComponentId(type));
-            return this;
-        }
-        public EcsQueryDesc WithAll<T0>() where T0 : struct => WithAll(typeof(T0));
-        public EcsQueryDesc WithAll<T0, T1>() where T0 : struct where T1 : struct => WithAll(typeof(T0), typeof(T1));
-        public EcsQueryDesc WithAll<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithAll(typeof(T0), typeof(T1), typeof(T2));
-        public EcsQueryDesc WithAll<T0, T1, T2, T3>() where T0 : struct where T1 : struct where T2 : struct where T3 : struct => WithAll(typeof(T0), typeof(T1), typeof(T2), typeof(T3));
+        //public EcsQueryDesc WithAll(params Type[] types)
+        //{
+        //    foreach (var type in types) WithAll(world.GetComponentId(type));
+        //    return this;
+        //}
+        public EcsQueryDesc WithAll<T0>() where T0 : struct => WithAll(compIds: world.GetComponentId<T0>());
+        public EcsQueryDesc WithAll<T0, T1>() where T0 : struct where T1 : struct => WithAll(world.GetComponentId<T0>(), world.GetComponentId<T1>());
+        public EcsQueryDesc WithAll<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithAll(world.GetComponentId<T0>(), world.GetComponentId<T1>(), world.GetComponentId<T2>());
+        public EcsQueryDesc WithAll<T0, T1, T2, T3>() where T0 : struct where T1 : struct where T2 : struct where T3 : struct => WithAll(world.GetComponentId<T0>(), world.GetComponentId<T1>(), world.GetComponentId<T2>(), world.GetComponentId<T3>());
         #endregion
 
         #region Any
@@ -333,14 +333,14 @@ namespace Poly.ArcEcs
             foreach (var compId in compIds) WithAny(compId);
             return this;
         }
-        public EcsQueryDesc WithAny(params Type[] types)
-        {
-            foreach (var type in types) WithAny(world.GetComponentId(type));
-            return this;
-        }
-        public EcsQueryDesc WithAny<T0>() where T0 : struct => WithAny(typeof(T0));
-        public EcsQueryDesc WithAny<T0, T1>() where T0 : struct where T1 : struct => WithAny(typeof(T0), typeof(T1));
-        public EcsQueryDesc WithAny<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithAny(typeof(T0), typeof(T1), typeof(T2));
+        //public EcsQueryDesc WithAny(params Type[] types)
+        //{
+        //    foreach (var type in types) WithAny(world.GetComponentId(type));
+        //    return this;
+        //}
+        public EcsQueryDesc WithAny<T0>() where T0 : struct => WithAny(compIds: world.GetComponentId<T0>());
+        public EcsQueryDesc WithAny<T0, T1>() where T0 : struct where T1 : struct => WithAny(world.GetComponentId<T0>(), world.GetComponentId<T1>());
+        public EcsQueryDesc WithAny<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithAny(world.GetComponentId<T0>(), world.GetComponentId<T1>(), world.GetComponentId<T2>());
         #endregion
 
         #region None
@@ -355,14 +355,14 @@ namespace Poly.ArcEcs
             foreach (var compId in compIds) WithNone(compId);
             return this;
         }
-        public EcsQueryDesc WithNone(params Type[] types)
-        {
-            foreach (var type in types) WithNone(world.GetComponentId(type));
-            return this;
-        }
-        public EcsQueryDesc WithNone<T0>() where T0 : struct => WithNone(typeof(T0));
-        public EcsQueryDesc WithNone<T0, T1>() where T0 : struct where T1 : struct => WithNone(typeof(T0), typeof(T1));
-        public EcsQueryDesc WithNone<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithNone(typeof(T0), typeof(T1), typeof(T2));
+        //public EcsQueryDesc WithNone(params Type[] types)
+        //{
+        //    foreach (var type in types) WithNone(world.GetComponentId(type));
+        //    return this;
+        //}
+        public EcsQueryDesc WithNone<T0>() where T0 : struct => WithNone(compIds: world.GetComponentId<T0>());
+        public EcsQueryDesc WithNone<T0, T1>() where T0 : struct where T1 : struct => WithNone(world.GetComponentId<T0>(), world.GetComponentId<T1>());
+        public EcsQueryDesc WithNone<T0, T1, T2>() where T0 : struct where T1 : struct where T2 : struct => WithNone(world.GetComponentId<T0>(), world.GetComponentId<T1>(), world.GetComponentId<T2>());
         #endregion
     }
     #endregion

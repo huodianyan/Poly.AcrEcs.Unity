@@ -21,7 +21,7 @@ namespace Poly.ArcEcs.Unity
 
         private void OnDestroy()
         {
-            if (world != null && world.IsEntityValid(entity))
+            if (world != null && !world.IsDisposed && world.IsEntityValid(entity))
                 world.DestroyEntity(entity);
         }
     }

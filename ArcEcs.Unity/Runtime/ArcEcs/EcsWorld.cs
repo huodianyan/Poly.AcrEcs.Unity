@@ -5,13 +5,13 @@ using System.Runtime.CompilerServices;
 namespace Poly.ArcEcs
 {
     #region EcsWorld
-    public class EcsWorld
+    public class EcsWorld : IDisposable
     {
         //World
         private readonly string id;
         private readonly object shared;
         private bool isInited;
-        private bool isDestroyed;
+        private bool disposed = false;
         //Entity
         internal EcsEntityInternal[] entityInternals;
         internal int entityCount;
@@ -41,6 +41,7 @@ namespace Poly.ArcEcs
         //private int runSystemCount;
 
         public string Id => id;
+        public bool IsDisposed => disposed;
         public int WorldSize => entityInternals.Length;
         public int EntityCount => entityCount - recycledEntityCount;
         public int ArchetypeCount => archetypeList.Count;
@@ -100,48 +101,64 @@ namespace Poly.ArcEcs
             //runSystems = new IEcsRunSystem[capacity];
             //runSystemCount = 0;
         }
-        public void Destroy()
+        ~EcsWorld()
         {
-            //Archetype
-            //for (int i = 0; i < archetypeCount; i++)
-            //{
-            //    ref var archetype = ref archetypes[i];
-            //    archetype.Dispose();
-            //}
-            //archetypes = null;
-            //archetypeCount = 0;
-            for (int i = 0; i < archetypeList.Count; i++)
+            Dispose(disposing: false);
+        }
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+        private void Dispose(bool disposing)
+        {
+            if (disposed) return;
+            if (disposing)
             {
-                var archetype = archetypeList[i];
-                archetype.Dispose();
+                // Free any other managed objects here.
+                //Archetype
+                //for (int i = 0; i < archetypeCount; i++)
+                //{
+                //    ref var archetype = ref archetypes[i];
+                //    archetype.Dispose();
+                //}
+                //archetypes = null;
+                //archetypeCount = 0;
+                for (int i = 0; i < archetypeList.Count; i++)
+                {
+                    var archetype = archetypeList[i];
+                    archetype.Dispose();
+                }
+                archetypeList.Clear();
+                //Entity
+                entityInternals = null;
+                entityCount = 0;
+                recycledEntities = null;
+                recycledEntityCount = 0;
+                //Component
+                tempCompIds = null;
+                compTypes = null;
+                compTypeCount = 0;
+                compTypeDict.Clear();
+                compTypeDict = null;
+                //Query
+                //queries = null;
+                //queryCount = 0;
+                queryList.Clear();
+                queryList = null;
+                //queryDescs = null;
+                queryDict.Clear();
+                queryDict = null;
+                recycledQueryDescs = null;
+                recycledQueryDescCount = 0;
+                //System
+                systemDict.Clear();
+                systemDict = null;
+                systemList.Clear();
+                systemList = null;
             }
-            archetypeList.Clear();
-            //Entity
-            entityInternals = null;
-            entityCount = 0;
-            recycledEntities = null;
-            recycledEntityCount = 0;
-            //Component
-            tempCompIds = null;
-            compTypes = null;
-            compTypeCount = 0;
-            compTypeDict.Clear();
-            compTypeDict = null;
-            //Query
-            //queries = null;
-            //queryCount = 0;
-            queryList.Clear();
-            queryList = null;
-            //queryDescs = null;
-            queryDict.Clear();
-            queryDict = null;
-            recycledQueryDescs = null;
-            recycledQueryDescCount = 0;
-            //System
-            systemDict.Clear();
-            systemDict = null;
-            systemList.Clear();
-            systemList = null;
+            // Free any unmanaged objects here.
+            disposed = true;
         }
         public void Init()
         {
@@ -177,9 +194,9 @@ namespace Poly.ArcEcs
             return count;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsEntityValid(EcsEntity entity) => entityInternals[entity.Index].Version == entity.Version;
+        public bool IsEntityValid(EcsEntity entity) => disposed ? false : entityInternals[entity.Index].Version == entity.Version;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EcsEntity GetEntity(int entityId) => entityInternals[entityId];
+        public EcsEntity GetEntity(int entityId) => disposed ? default : entityInternals[entityId];
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool IsEntityValid(int entityId) => entityId >= 0 && entityId < entityCount && entityInternals[entityId].Version > 0;
@@ -225,12 +242,17 @@ namespace Poly.ArcEcs
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EcsEntity CreateEntity() => CreateEntityInternal(null, 0);
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public EcsEntity CreateEntity(params Type[] types) => CreateEntityInternal(GetCompnentIds(types), types.Length);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EcsEntity CreateEntity(params Type[] types) => CreateEntityInternal(GetCompnentIds(types), types.Length);
+        public EcsEntity CreateEntity(params byte[] compIds) => CreateEntityInternal(compIds);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EcsEntity CreateEntity(params byte[] compIds) => CreateEntityInternal(compIds, compIds.Length);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref EcsEntityInternal CreateEntityInternal(params byte[] compIds) => ref CreateEntityInternal(compIds, compIds.Length);
+        internal ref EcsEntityInternal CreateEntityInternal(params byte[] compIds)
+        {
+            if (compIds.Length > 1) Array.Sort(compIds);
+            return ref CreateEntityInternal(compIds, compIds.Length);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ref EcsEntityInternal CreateEntityInternal(byte[] compIds, int count)
         {
@@ -260,51 +282,12 @@ namespace Poly.ArcEcs
             //recycledEntities[recycledEntityCount++] = entityId;
             EntityDestroyedEvent?.Invoke(entityInternal);
         }
-        public EcsEntity CreateEntity<T0>(T0 comp0) where T0 : struct
-        {
-            var id0 = GetComponentId(typeof(T0));
-            ref var entity = ref CreateEntityInternal(id0);
-            SetComponentInternal(ref entity, comp0, id0);
-            return entity;
-        }
-        public EcsEntity CreateEntity<T0, T1>(T0 comp0, T1 comp1) where T0 : struct where T1 : struct
-        {
-            var id0 = GetComponentId(typeof(T0));
-            var id1 = GetComponentId(typeof(T1));
-            ref var entity = ref CreateEntityInternal(id0, id1);
-            SetComponentInternal(ref entity, comp0, id0);
-            SetComponentInternal(ref entity, comp1, id1);
-            return entity;
-        }
-        public EcsEntity CreateEntity<T0, T1, T2>(T0 comp0, T1 comp1, T2 comp2) where T0 : struct where T1 : struct where T2 : struct
-        {
-            var id0 = GetComponentId(typeof(T0));
-            var id1 = GetComponentId(typeof(T1));
-            var id2 = GetComponentId(typeof(T2));
-            ref var entity = ref CreateEntityInternal(id0, id1, id2);
-            SetComponentInternal(ref entity, comp0, id0);
-            SetComponentInternal(ref entity, comp1, id1);
-            SetComponentInternal(ref entity, comp2, id2);
-            return entity;
-        }
-        public EcsEntity CreateEntity<T0, T1, T2, T3>(T0 comp0, T1 comp1, T2 comp2, T3 comp3) where T0 : struct where T1 : struct where T2 : struct where T3 : struct
-        {
-            var id0 = GetComponentId(typeof(T0));
-            var id1 = GetComponentId(typeof(T1));
-            var id2 = GetComponentId(typeof(T2));
-            var id3 = GetComponentId(typeof(T3));
-            ref var entity = ref CreateEntityInternal(id0, id1, id2, id3);
-            SetComponentInternal(ref entity, comp0, id0);
-            SetComponentInternal(ref entity, comp1, id1);
-            SetComponentInternal(ref entity, comp2, id2);
-            SetComponentInternal(ref entity, comp3, id3);
-            return entity;
-        }
+
         public bool HasComponent<T>(EcsEntity entity) where T : struct
         {
             ref var entityInternal = ref entityInternals[entity.Index];
             if (entity.Version != entityInternal.Version) return false;
-            var compId = GetComponentId(typeof(T));
+            var compId = GetComponentId<T>();
             return HasComponentInternal(ref entityInternal, compId);
         }
         public bool HasComponent(EcsEntity entity, byte compId)
@@ -320,7 +303,7 @@ namespace Poly.ArcEcs
         {
             ref var entityInternal = ref entityInternals[entity.Index];
             if (entity.Version != entityInternal.Version) return ref GetDefaultComp<T>();
-            var compId = GetComponentId(typeof(T));
+            var compId = GetComponentId<T>();
             return ref GetComponentInternal<T>(ref entityInternal, compId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -369,7 +352,7 @@ namespace Poly.ArcEcs
         {
             ref var entityInternal = ref entityInternals[entity.Index];
             if (entity.Version != entityInternal.Version) return;
-            var addCompId = GetComponentId(typeof(T));
+            var addCompId = GetComponentId<T>();
             AddComponentInternal<T>(ref entityInternal, addComp, addCompId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -413,7 +396,7 @@ namespace Poly.ArcEcs
         {
             ref var entityInternal = ref entityInternals[entity.Index];
             if (entity.Version != entityInternal.Version) return;
-            var removeCompId = GetComponentId(typeof(T));
+            var removeCompId = GetComponentId<T>();
             //RemoveComponent(entityId, removeCompId);
             RemoveComponentInternal(ref entityInternal, removeCompId);
         }
@@ -444,7 +427,7 @@ namespace Poly.ArcEcs
         {
             ref var entityInternal = ref entityInternals[entity.Index];
             if (entity.Version != entityInternal.Version) return;
-            var compId = GetComponentId(typeof(T));
+            var compId = GetComponentId<T>();
             //SetComponent<T>(entityId, comp, compId);
             SetComponentInternal(ref entityInternal, comp, compId);
         }
@@ -459,7 +442,7 @@ namespace Poly.ArcEcs
             SetComponentInternal(ref entityInternal, comp, compId);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void SetComponentInternal<T>(ref EcsEntityInternal entity, T comp, byte compId) where T : struct
+        internal void SetComponentInternal<T>(ref EcsEntityInternal entity, T comp, byte compId) where T : struct
         {
             var archetype = archetypeList[entity.ArchetypeId];
             archetype.SetComponent(compId, entity.ArchetypeChunkId, comp);
@@ -574,17 +557,25 @@ namespace Poly.ArcEcs
             return preArchetype;
         }
         //public ref EcsArchetype GetArchetype(params Type[] types)
-        public EcsArchetype GetArchetype(params Type[] types)
+        //public EcsArchetype GetArchetype(params Type[] types)
+        //{
+        //    if (types == null || types.Length == 0)
+        //        return archetypeList[0];
+        //    var length = types.Length;
+        //    //tempCompIds.Length = length;
+        //    for (int i = 0; i < length; i++)
+        //        tempCompIds[i] = GetComponentId(types[i]);
+        //    //var compIds = GetCompnentIds(types);
+        //    Array.Sort(tempCompIds, 0, length);
+        //    return GetArchetype(tempCompIds, length);
+        //}
+        public EcsArchetype GetArchetype(params byte[] compIds)
         {
-            if (types == null || types.Length == 0)
+            if (compIds == null || compIds.Length == 0)
                 return archetypeList[0];
-            var length = types.Length;
-            //tempCompIds.Length = length;
-            //for (int i = 0; i < length; i++)
-            //    tempCompIds[i] = GetComponentId(types[i]);
-            var compIds = GetCompnentIds(types);
-            Array.Sort(compIds, 0, length);
-            return GetArchetype(tempCompIds, length);
+            var length = compIds.Length;
+            if (length > 1) Array.Sort(compIds);
+            return GetArchetype(compIds, length);
         }
         //internal ref EcsArchetype GetArchetype(byte[] compIds, int count)
         internal EcsArchetype GetArchetype(byte[] compIds, int count)
@@ -623,7 +614,48 @@ namespace Poly.ArcEcs
         #endregion
 
         #region Component
-        public int RegisterComponent<T>() where T : struct
+        //public byte RegisterComponent<T>() where T : struct
+        //{
+        //    var type = typeof(T);
+        //    if (compTypeDict.TryGetValue(type, out var compType))
+        //        return compType.Id;
+        //    var compId = compTypeCount;
+        //    compType = new EcsComponentType
+        //    {
+        //        Id = compId,
+        //        Type = type,
+        //        CompArray = new EcsComponentArray<T>(1),
+        //        ComponentArrayCreator = (capacity) => new EcsComponentArray<T>(capacity),
+        //        CopyChunkComponent = (src, chunkId, dest) =>
+        //        {
+        //            var comp = src.GetComponent<T>(compId, chunkId);
+        //            dest.AddComponent(compId, comp);
+        //        }
+        //    };
+        //    compTypeDict[type] = compType;
+        //    compTypes[compId] = compType;
+        //    compTypeCount++;
+        //    return compId;
+        //}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ref T GetDefaultComp<T>() where T : struct
+        {
+            return ref ((EcsComponentArray<T>)compTypeDict[typeof(T)].CompArray).Array[0];
+        }
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //internal byte[] GetCompnentIds(params Type[] types)
+        //{
+        //    for (int i = 0; i < types.Length; i++)
+        //        tempCompIds[i] = GetComponentId(types[i]);
+        //    return tempCompIds;
+        //}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private byte GetComponentId(Type type)
+        {
+            if (!compTypeDict.TryGetValue(type, out var compType)) throw new Exception($"{type} not registered!");
+            return compType.Id;
+        }
+        public byte GetComponentId<T>() where T : struct
         {
             var type = typeof(T);
             if (compTypeDict.TryGetValue(type, out var compType))
@@ -645,25 +677,6 @@ namespace Poly.ArcEcs
             compTypes[compId] = compType;
             compTypeCount++;
             return compId;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref T GetDefaultComp<T>() where T : struct
-        {
-            return ref ((EcsComponentArray<T>)compTypeDict[typeof(T)].CompArray).Array[0];
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal byte[] GetCompnentIds(params Type[] types)
-        {
-            for (int i = 0; i < types.Length; i++)
-                tempCompIds[i] = GetComponentId(types[i]);
-            return tempCompIds;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte GetComponentId(Type type)
-        {
-            if (!compTypeDict.TryGetValue(type, out var compType))
-                return 0;
-            return compType.Id;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Type GetComponentType(byte typeId)
@@ -758,7 +771,7 @@ namespace Poly.ArcEcs
         }
         public void DestroySystem(IEcsSystem system)
         {
-            if (isDestroyed) return;
+            if (disposed) return;
             var type = system.GetType();
             if (systemDict.ContainsKey(type))
                 return;

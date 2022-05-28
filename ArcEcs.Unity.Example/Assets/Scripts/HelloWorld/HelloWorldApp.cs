@@ -1,7 +1,4 @@
-using System.Collections;
 using System.Collections.Generic;
-using Poly.ArcEcs;
-using Poly.ArcEcs.Unity;
 using UnityEngine;
 
 namespace Poly.ArcEcs.Unity.Example
@@ -15,22 +12,23 @@ namespace Poly.ArcEcs.Unity.Example
 
         private void Awake()
         {
+            DontDestroyOnLoad(gameObject);
             world = new EcsWorld("Test", null, config);
 
-            world.RegisterComponent<AComp>();
-            world.RegisterComponent<BComp>();
-            world.RegisterComponent<CComp>();
+            // world.RegisterComponent<CompA>();
+            // world.RegisterComponent<CompB>();
+            // world.RegisterComponent<CompC>();
 
+            world.AddSystem(new ConversionSystem());
             world.AddSystem(new TestQueryEventSystem());
 #if UNITY_EDITOR
             world.AddSystem(new WorldDebugSystem());
 #endif
             world.Init();
-
         }
         private void OnDestroy()
         {
-            world.Destroy();
+            world.Dispose();
         }
         private void Update()
         {
@@ -38,36 +36,36 @@ namespace Poly.ArcEcs.Unity.Example
             if (Input.GetKeyDown(KeyCode.A))
             {
                 entity = world.CreateEntity();
-                world.AddComponent<AComp>(entity);
-                world.AddComponent<BComp>(entity);
-                world.AddComponent<CComp>(entity);
+                world.AddComponent<CompA>(entity);
+                world.AddComponent<CompB>(entity);
+                world.AddComponent<CompC>(entity);
             }
             if (Input.GetKeyDown(KeyCode.B))
             {
                 entity = world.CreateEntity();
-                world.AddComponent<BComp>(entity);
+                world.AddComponent<CompB>(entity);
             }
             if (Input.GetKeyDown(KeyCode.C))
             {
                 entity = world.CreateEntity();
-                world.AddComponent<CComp>(entity);
+                world.AddComponent<CompC>(entity);
             }
             if (entity.IsValid())
                 Debug.Log($"Create Entity: {entity}");
             world.Update();
         }
     }
-    public struct AComp
+    public struct CompA
     {
         public float A;
         public string Str;
         public List<int> IntList;
     }
-    public struct BComp
+    public struct CompB
     {
         public float B;
     }
-    public struct CComp
+    public struct CompC
     {
         public float C;
     }
@@ -80,7 +78,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         public void Init(EcsWorld world)
         {
-            var desc = world.CreateQueryDesc().WithAll<AComp, BComp>().WithNone<CComp>().Build();
+            var desc = world.CreateQueryDesc().WithAll<CompA, CompB>().WithNone<CompC>().Build();
             query = world.GetQuery(desc);
             query.ArchetypeAddedEvent += OnArchetypeAddedEvent;
         }
@@ -91,7 +89,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         public void Update()
         {
-            query.ForEach((EcsEntity entity, ref AComp a) =>
+            query.ForEach((EcsEntity entity, ref CompA a) =>
             {
                 a.A++;
             });
