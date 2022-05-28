@@ -2,8 +2,7 @@
 
 namespace Poly.ArcEcs
 {
-    #region System
-    public interface IEcsSystem : IDisposable
+    public interface IEcsSystem
     {
         //IWorld World { get; set; }
         void Init(EcsWorld world);
@@ -23,6 +22,4 @@ namespace Poly.ArcEcs
     //{
     //    void Destroy(EcsWorld world);
     //}
-    #endregion
-
 }

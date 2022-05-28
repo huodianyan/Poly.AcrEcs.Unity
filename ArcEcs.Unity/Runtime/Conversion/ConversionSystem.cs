@@ -1,12 +1,9 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Poly.ArcEcs.Unity
 {
-    public class ConversionSystem : IEcsSystem
+    public class ConversionSystem : IEcsSystem, IDisposable
     {
         private EcsWorld world;
         private EcsQuery query;
@@ -32,7 +29,7 @@ namespace Poly.ArcEcs.Unity
         private void OnSceneLoaded(Scene scene, LoadSceneMode arg1)
         {
             var gos = scene.GetRootGameObjects();
-            foreach(var go in gos)
+            foreach (var go in gos)
             {
                 world.CreateEntity(go);
             }
@@ -42,4 +39,5 @@ namespace Poly.ArcEcs.Unity
 
         }
     }
+
 }

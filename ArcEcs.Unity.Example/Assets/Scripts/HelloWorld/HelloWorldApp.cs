@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -19,8 +20,16 @@ namespace Poly.ArcEcs.Unity.Example
             // world.RegisterComponent<CompB>();
             // world.RegisterComponent<CompC>();
 
+            //PreUpdate
             world.AddSystem(new ConversionSystem());
+            world.AddSystem(new UTransformSyncFromSystem());
+            //BeginUpdateEcbSystem
+            world.AddSystem(new BeginUpdateEcbSystem());
+
             world.AddSystem(new TestQueryEventSystem());
+
+            //LateUpdate
+            world.AddSystem(new UTransformSyncToSystem());
 #if UNITY_EDITOR
             world.AddSystem(new WorldDebugSystem());
 #endif
@@ -69,7 +78,7 @@ namespace Poly.ArcEcs.Unity.Example
     {
         public float C;
     }
-    public class TestQueryEventSystem : IEcsSystem
+    public class TestQueryEventSystem : IEcsSystem, IDisposable
     {
         private EcsQuery query;
 

@@ -7,7 +7,7 @@ using Object = UnityEngine.Object;
 
 namespace Poly.ArcEcs.Unity
 {
-    public sealed class WorldDebugSystem : IEcsSystem
+    public sealed class WorldDebugSystem : IEcsSystem, IDisposable
     {
         string worldId;
         GameObject rootGO;

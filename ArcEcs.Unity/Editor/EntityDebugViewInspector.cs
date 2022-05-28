@@ -100,9 +100,17 @@ namespace Poly.ArcEcs.Unity.Editor
                 serializedObject.ApplyModifiedProperties();
                 EditorUtility.SetDirty(target);
 
-                var component = compCache[changeIndex];
-                // var type = component.GetType();
-                world.SetComponent(debugView.Entity, component);
+                // var component = compCache[changeIndex];
+                var component = compList[changeIndex];
+                var type = component.GetType();
+                // world.SetComponent(debugView.Entity, component);
+                var ecbSystem = (EcbSystem)world.GetSystem(typeof(BeginUpdateEcbSystem));
+                var ecb = ecbSystem.CreateEcb();
+                MethodInfo method = typeof(EcsEntityCommandBuffer).GetMethod("SetComponent");
+                MethodInfo genericMethod = method.MakeGenericMethod(type);
+                genericMethod.Invoke(ecb, new object[]{debugView.Entity, component});
+                // ecb.SetComponent(debugView.Entity, component);
+                Debug.Log($"{changeIndex}: {component}");
                 // var pool = world.GetComponentArrayType(type);
                 // // pool.Set(debugView.Entity, compList[changeIndex]);
                 // try

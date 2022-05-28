@@ -46,7 +46,7 @@ namespace Poly.ArcEcs
         void Add();
         object Get(int index);
         void Set(int index, object comp);
-        //void Clear();
+        void Clear();
         bool RemoveAt(int index);
     }
     public class EcsComponentArray<T> : IEcsComponentArray where T : struct
@@ -88,6 +88,11 @@ namespace Poly.ArcEcs
         object IEcsComponentArray.Get(int index) => items[index];
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void IEcsComponentArray.Set(int index, object comp) => items[index] = (T)comp;
+        public void Clear()
+        {
+            System.Array.Clear(items, 0, count);
+            count = 0;
+        }
     }
     #endregion
 }

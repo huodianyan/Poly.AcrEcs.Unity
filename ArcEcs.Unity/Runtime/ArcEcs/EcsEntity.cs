@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Poly.ArcEcs
 {
-    #region Entity
+    [Serializable]
     public struct EcsEntity : IEquatable<EcsEntity>
     {
         public int Index;
@@ -28,7 +28,11 @@ namespace Poly.ArcEcs
         internal int ArchetypeId;
         internal int ArchetypeChunkId;
 
+        public override string ToString()
+        {
+            return $"EntityInternal{{{Index},{ComponentCount},{ArchetypeId},{ArchetypeChunkId}}}";
+        }
+
         public static implicit operator EcsEntity(EcsEntityInternal v) => new EcsEntity { Index = v.Index, Version = v.Version };
     }
-    #endregion
 }

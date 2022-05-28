@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace Poly.ArcEcs
 {
     #region EcsWorld
-    public class EcsWorld : IDisposable
+    public partial class EcsWorld : IDisposable
     {
         //World
         private readonly string id;
@@ -261,7 +261,9 @@ namespace Poly.ArcEcs
             var archetype = GetArchetype(compIds, count);
             entity.ArchetypeId = archetype.id;
             var entityId = entity.Index;
-            archetype.AddEntity(ref entity);
+            archetype.AddEntity(ref entity, true);
+            //for (int i = 0; i < count; i++)
+            //    archetype.AddComponent(compIds[i]);
             //Console.WriteLine($"EcsWorld.CreateEntity: {entityId},{archetypeData.entityList.Count}");
             EntityCreatedEvent?.Invoke(entity);
             return ref entity;
@@ -670,6 +672,7 @@ namespace Poly.ArcEcs
                 CopyChunkComponent = (src, chunkId, dest) =>
                 {
                     var comp = src.GetComponent<T>(compId, chunkId);
+                    Console.WriteLine($"EcsComponentType[{type.Name}].CopyChunkComponent: {src}->{dest}, {comp}");
                     dest.AddComponent(compId, comp);
                 }
             };
@@ -777,7 +780,8 @@ namespace Poly.ArcEcs
                 return;
             systemDict.Remove(type);
             systemList.Remove(system);
-            system.Dispose();
+            if(system is IDisposable disposableSystem)
+                disposableSystem.Dispose();
             //if (system is IEcsDestroySystem destroySystem)
             //    destroySystem.Destroy(this);
             //if (system is IEcsRunSystem runSystem)

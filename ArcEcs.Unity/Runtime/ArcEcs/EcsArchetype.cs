@@ -85,6 +85,10 @@ namespace Poly.ArcEcs
                 }
             }
         }
+        public override string ToString()
+        {
+            return $"Archetype{{{id}:{string.Join(",", compIds)}}}";
+        }
         internal void Dispose()
         {
             entityIds = null;
@@ -115,17 +119,18 @@ namespace Poly.ArcEcs
             return compId < compIndexCount && compIndexs[compId] != 0xff;
         }
 
-        internal int AddEntity(ref EcsEntityInternal entity)
+        internal int AddEntity(ref EcsEntityInternal entity, bool addComps = false)
         {
             var chunkId = entityCount;
             //entityIds.Add(entityData.Index);
             if (entityCount == entityIds.Length) Array.Resize(ref entityIds, entityCount << 1);
             entityIds[entityCount++] = entity.Index;
             //Console.WriteLine($"EcsArchetypeData.AddEntity: {entityList.Count}");
+            Console.WriteLine($"EcsArchetype.AddEntity: {this},{entity}->{id},{chunkId}");
             entity.ArchetypeId = id;
             entity.ArchetypeChunkId = chunkId;
-            for (int i = 0; i < compCount; i++)
-                compArrays[i].Add();
+            if (addComps)
+                for (int i = 0; i < compCount; i++) compArrays[i].Add();
             EntityAddedEvent?.Invoke(entity.Index);
             return chunkId;
         }
@@ -144,27 +149,26 @@ namespace Poly.ArcEcs
             }
             //Console.WriteLine($"FastList.RemoveAtSwap: {count}, {index}");
             entityIds[entityCount] = default;
-            //if (entityIds.RemoveAtSwap(chunkId))
-            //{
-            //    var swapEntityId = entityIds[chunkId];
-            //    entityData = ref world.GetEntityData(swapEntityId);
-            //    entityData.ArchetypeChunkId = chunkId;
-            //}
             for (int i = 0; i < compCount; i++)
                 compArrays[i].RemoveAt(chunkId);
             EntityRemovedEvent?.Invoke(entity.Index);
         }
-        internal ref T AddComponent<T>(int compId) where T : struct
+        //internal ref T AddComponent<T>(int compId) where T : struct
+        //{
+        //    var compIndex = compIndexs[compId];
+        //    var list = (EcsComponentArray<T>)compArrays[compIndex];
+        //    var chunkId = list.Add(default);
+        //    return ref list.Array[chunkId];
+        //}
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void AddComponent(int compId)
         {
-            var compIndex = compIndexs[compId];
-            var list = (EcsComponentArray<T>)compArrays[compIndex];
-            var chunkId = list.Add(default);
-            return ref list.Array[chunkId];
+            if (!HasComponent(compId)) return;
+            compArrays[compIndexs[compId]].Add();
         }
         internal void AddComponent<T>(int compId, T comp) where T : struct
         {
-            if (!HasComponent(compId))
-                return;
+            if (!HasComponent(compId)) return;
             var compIndex = compIndexs[compId];
             var list = (EcsComponentArray<T>)compArrays[compIndex];
             list.Add(comp);
