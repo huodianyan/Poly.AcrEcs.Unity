@@ -2,10 +2,10 @@ using UnityEngine;
 
 namespace Poly.ArcEcs.Unity
 {
-    public class UTransformSyncToSystem : IEcsSystem
+    public class UTransformSyncToSystem : ISystem
     {
-        private EcsQuery transformQuery;
-        public void Init(EcsWorld world)
+        private Query transformQuery;
+        public void Init(World world)
         {
             var desc = world.CreateQueryDesc().WithAll<UTransform>().Build();
             transformQuery = world.GetQuery(desc);
@@ -21,10 +21,10 @@ namespace Poly.ArcEcs.Unity
             });
         }
     }
-    public class UTransformSyncFromSystem : IEcsSystem
+    public class UTransformSyncFromSystem : ISystem
     {
-        private EcsQuery transformQuery;
-        public void Init(EcsWorld world)
+        private Query transformQuery;
+        public void Init(World world)
         {
             var desc = world.CreateQueryDesc().WithAll<UTransform>().Build();
             transformQuery = world.GetQuery(desc);

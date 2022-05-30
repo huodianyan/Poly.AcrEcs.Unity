@@ -106,7 +106,7 @@ namespace Poly.ArcEcs.Unity.Editor
                 // world.SetComponent(debugView.Entity, component);
                 var ecbSystem = (EcbSystem)world.GetSystem(typeof(BeginUpdateEcbSystem));
                 var ecb = ecbSystem.CreateEcb();
-                MethodInfo method = typeof(EcsEntityCommandBuffer).GetMethod("SetComponent");
+                MethodInfo method = typeof(EntityCommandBuffer).GetMethod("SetComponent");
                 MethodInfo genericMethod = method.MakeGenericMethod(type);
                 genericMethod.Invoke(ecb, new object[]{debugView.Entity, component});
                 // ecb.SetComponent(debugView.Entity, component);

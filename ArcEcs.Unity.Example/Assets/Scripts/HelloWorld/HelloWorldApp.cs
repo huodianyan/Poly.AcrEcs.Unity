@@ -7,14 +7,14 @@ namespace Poly.ArcEcs.Unity.Example
     public class HelloWorldApp : MonoBehaviour
     {
         [SerializeField]
-        private EcsWorld.Config config;
+        private World.Config config;
 
-        private EcsWorld world;
+        private World world;
 
         private void Awake()
         {
             DontDestroyOnLoad(gameObject);
-            world = new EcsWorld("Test", null, config);
+            world = new World("Test", null, config);
 
             // world.RegisterComponent<CompA>();
             // world.RegisterComponent<CompB>();
@@ -41,7 +41,7 @@ namespace Poly.ArcEcs.Unity.Example
         }
         private void Update()
         {
-            EcsEntity entity = default;
+            Entity entity = default;
             if (Input.GetKeyDown(KeyCode.A))
             {
                 entity = world.CreateEntity();
@@ -78,14 +78,14 @@ namespace Poly.ArcEcs.Unity.Example
     {
         public float C;
     }
-    public class TestQueryEventSystem : IEcsSystem, IDisposable
+    public class TestQueryEventSystem : ISystem, IDisposable
     {
-        private EcsQuery query;
+        private Query query;
 
         public TestQueryEventSystem()
         {
         }
-        public void Init(EcsWorld world)
+        public void Init(World world)
         {
             var desc = world.CreateQueryDesc().WithAll<CompA, CompB>().WithNone<CompC>().Build();
             query = world.GetQuery(desc);
@@ -98,12 +98,12 @@ namespace Poly.ArcEcs.Unity.Example
         }
         public void Update()
         {
-            query.ForEach((EcsEntity entity, ref CompA a) =>
+            query.ForEach((Entity entity, ref CompA a) =>
             {
                 a.A++;
             });
         }
-        private void OnArchetypeAddedEvent(EcsArchetype archetype)
+        private void OnArchetypeAddedEvent(Archetype archetype)
         {
             Debug.Log($"{query.QueryDesc}.Add: {archetype.Id}");
         }

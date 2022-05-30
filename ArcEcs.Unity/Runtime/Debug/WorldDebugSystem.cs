@@ -7,7 +7,7 @@ using Object = UnityEngine.Object;
 
 namespace Poly.ArcEcs.Unity
 {
-    public sealed class WorldDebugSystem : IEcsSystem, IDisposable
+    public sealed class WorldDebugSystem : ISystem, IDisposable
     {
         string worldId;
         GameObject rootGO;
@@ -16,10 +16,10 @@ namespace Poly.ArcEcs.Unity
         Transform archetypeRoot;
         readonly bool _bakeComponentsInName;
         readonly string _entityNameFormat;
-        EcsWorld world;
+        World world;
         EntityDebugView[] entityDebugViews;
         // Dictionary<int, byte> dirtyEntityDict;
-        List<EcsEntity> dirtyEntityList;
+        List<Entity> dirtyEntityList;
         Dictionary<int, QueryDebugView> queryViewDict;
         Dictionary<int, ArchetypeDebugView> archetypeViewDict;
         Type[] _typesCache;
@@ -30,7 +30,7 @@ namespace Poly.ArcEcs.Unity
             _entityNameFormat = entityNameFormat;
         }
 
-        public void Init(EcsWorld world)
+        public void Init(World world)
         {
             this.world = world;
             worldId = world.Id;
@@ -49,7 +49,7 @@ namespace Poly.ArcEcs.Unity
 
             entityDebugViews = new EntityDebugView[this.world.WorldSize];
             // dirtyEntityDict = new Dictionary<int, byte>();
-            dirtyEntityList = new List<EcsEntity>();
+            dirtyEntityList = new List<Entity>();
 
             world.EntityCreatedEvent += OnEntityCreated;
             world.EntityDestroyedEvent += OnEntityDestroyed;
@@ -59,7 +59,7 @@ namespace Poly.ArcEcs.Unity
             world.QueryCreatedEvent += OnQueryCreated;
             world.ArchetypeCreatedEvent += OnArchetypeCreated;
 
-            var entities = Array.Empty<EcsEntity>();
+            var entities = Array.Empty<Entity>();
             var entitiesCount = this.world.GetAllEntities(ref entities);
             for (var i = 0; i < entitiesCount; i++)
             {
@@ -102,7 +102,7 @@ namespace Poly.ArcEcs.Unity
             }
         }
 
-        public void OnEntityCreated(EcsEntity entity)
+        public void OnEntityCreated(Entity entity)
         {
             var entityId = entity.Index;
             var entityView = entityDebugViews[entityId];
@@ -121,7 +121,7 @@ namespace Poly.ArcEcs.Unity
                 entityView.gameObject.SetActive(true);
             }
         }
-        public void OnEntityDestroyed(EcsEntity entity)
+        public void OnEntityDestroyed(Entity entity)
         {
             var entityId = entity.Index;
             var entityView = entityDebugViews[entityId];
@@ -133,7 +133,7 @@ namespace Poly.ArcEcs.Unity
             }
         }
 
-        public void OnComponentAdded(EcsEntity entity, int compId)
+        public void OnComponentAdded(Entity entity, int compId)
         {
             if (_bakeComponentsInName)
             {
@@ -141,7 +141,7 @@ namespace Poly.ArcEcs.Unity
                     dirtyEntityList.Add(entity);
             }
         }
-        public void OnComponentRemoved(EcsEntity entity, int compId)
+        public void OnComponentRemoved(Entity entity, int compId)
         {
             if (_bakeComponentsInName)
             {
@@ -149,7 +149,7 @@ namespace Poly.ArcEcs.Unity
                     dirtyEntityList.Add(entity);
             }
         }
-        public void OnQueryCreated(EcsQuery query)
+        public void OnQueryCreated(Query query)
         {
             if (queryViewDict.TryGetValue(query.Hash, out var queryView))
             {
@@ -162,7 +162,7 @@ namespace Poly.ArcEcs.Unity
             queryView.Init(world, query, this);
             queryViewDict.Add(query.Hash, queryView);
         }
-        public void OnArchetypeCreated(EcsArchetype archetype)
+        public void OnArchetypeCreated(Archetype archetype)
         {
             var archetypeId = archetype.Id;
             if (archetypeViewDict.TryGetValue(archetypeId, out var archetypeView))

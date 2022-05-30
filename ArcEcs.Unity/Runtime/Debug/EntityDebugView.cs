@@ -11,15 +11,15 @@ namespace Poly.ArcEcs.Unity
         private static Type[] typesCache;
 
         [NonSerialized]
-        public EcsWorld World;
+        public World World;
         [NonSerialized]
-        public EcsEntity Entity;
+        public Entity Entity;
         [NonSerialized]
         public WorldDebugSystem DebugSystem;
         [SerializeReference]
         public List<object> ComponentList = new List<object>();
 
-        internal void Init(EcsWorld world, EcsEntity entity, WorldDebugSystem system)
+        internal void Init(World world, Entity entity, WorldDebugSystem system)
         {
             this.World = world;
             this.Entity = entity;

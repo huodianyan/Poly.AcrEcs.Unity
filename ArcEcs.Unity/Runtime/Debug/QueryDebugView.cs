@@ -10,14 +10,14 @@ namespace Poly.ArcEcs.Unity
         [SerializeField]
         public List<ArchetypeDebugView> ArchetypeViewList = new List<ArchetypeDebugView>();
 
-        private EcsWorld world;
-        private EcsQuery query;
+        private World world;
+        private Query query;
         private WorldDebugSystem system;
 
-        public EcsWorld World => world;
-        public EcsQuery Query => query;
+        public World World => world;
+        public Query Query => query;
 
-        internal void Init(EcsWorld world, EcsQuery query, WorldDebugSystem system)
+        internal void Init(World world, Query query, WorldDebugSystem system)
         {
             this.world = world;
             this.query = query;
@@ -31,7 +31,7 @@ namespace Poly.ArcEcs.Unity
         {
             query.ArchetypeAddedEvent -= OnArchetypeAdded;
         }
-        private void OnArchetypeAdded(EcsArchetype archetype)
+        private void OnArchetypeAdded(Archetype archetype)
         {
             var archetypeView = system.GetArchetypeView(archetype.Id);
             if(archetypeView != null)

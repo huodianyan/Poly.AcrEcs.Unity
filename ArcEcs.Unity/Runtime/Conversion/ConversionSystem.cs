@@ -3,15 +3,15 @@ using UnityEngine.SceneManagement;
 
 namespace Poly.ArcEcs.Unity
 {
-    public class ConversionSystem : IEcsSystem, IDisposable
+    public class ConversionSystem : ISystem, IDisposable
     {
-        private EcsWorld world;
-        private EcsQuery query;
+        private World world;
+        private Query query;
 
         public ConversionSystem()
         {
         }
-        public void Init(EcsWorld world)
+        public void Init(World world)
         {
             this.world = world;
 

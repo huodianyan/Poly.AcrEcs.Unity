@@ -10,15 +10,15 @@ namespace Poly.ArcEcs.Unity
         [SerializeField]
         public List<EntityDebugView> EntityViewList = new List<EntityDebugView>();
 
-        private EcsWorld world;
-        private EcsArchetype archetype;
+        private World world;
+        private Archetype archetype;
         private WorldDebugSystem system;
 
-        public EcsWorld World => world;
-        public EcsArchetype Archetype => archetype;
+        public World World => world;
+        public Archetype Archetype => archetype;
         public WorldDebugSystem System => system;
 
-        internal void Init(EcsWorld world, EcsArchetype archetype, WorldDebugSystem system)
+        internal void Init(World world, Archetype archetype, WorldDebugSystem system)
         {
             this.world = world;
             this.archetype = archetype;

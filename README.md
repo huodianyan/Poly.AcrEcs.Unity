@@ -18,6 +18,7 @@
 - Built in support for dependency injection via Poly.IOC (or other DI frameworks)
 - Lots of extension and architectural helpers to help MonoBehaviours interact with the core framework
 - Plays nicely with scene first style setups
+- Physics event agent publish event in entity
 
 ## Installation
 
